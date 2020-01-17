@@ -1,0 +1,615 @@
+---
+title: "536Final"
+author: "Xinyu Gao"
+date: "December 3, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 1
+# Question 1
+Data
+```{r}
+data <- c(1105, 4624, 411111, 157342, 14, 497, 483, 1008)
+data.array <- array(data, c(2,2,2))
+data.array
+```
+
+# The most complex model: The Saturated Log-linear Model
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} + u_{13(ik)} + u_{23(jk)} +u_{123(ijk)}$$
+Interpretations:
+
+We set the variable "Safety Equipment in Use" be $X_1$, "Whether Ejected" be $X_2$, and "Injury" be $X_3$.
+
+1. $u$ represents the mean of logarithms of the expected counts;
+
+2. $u_{1(i)}$ represents the deviation from the grand mean $u$ assocaited with category i of $X_1$;
+
+3. $u_{2(j)}$ represents the deviation from the grand mean $u$ assocaited with category j of $X_2$;
+
+4. $u_{3(k)}$ represents the deviation from the grand mean $u$ assocaited with category k of $X_3$;
+
+5. $u_{12(ij)}$ represents thedeviation from $u + u_{1(i)} + u_{2(j)}$ assocaited with the interaction between category i of $X_1$ and category j of $X_2$;
+
+6. $u_{13(ik)}$ represents thedeviation from $u + u_{1(i)} + u_{3(k)}$ assocaited with the interaction between category i of $X_1$ and category k of $X_3$;
+
+7. $u_{23(jk)}$ represents thedeviation from $u + u_{2(j)} + u_{3(k)}$ assocaited with the interaction between category j of $X_2$ and category k of $X_3$;
+
+8. $u_{123(ijk)}$ represents thedeviation from $u + u_{1(i)} + u_{2(j)} + u_{123(ijk)}$ assocaited with the interaction between category i of $X_1$, category j of $X_2$ and category k of $X_3$.
+
+
+Then the R commands:
+```{r}
+saturated.loglin <- loglin(data.array, margin = list(c(1,2,3)))
+```
+
+
+# Complete Independence Model
+We set to zero the first and second order interaction terms
+$$u_{12(ij)}= u_{13(ik)} = u_{23(jk)} = u_{123(ijk)} = 0$$
+in the saturated model, which can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3(k)}$$
+
+We assume each variable is independent of the other two variables, $X_1$ independent $(X_2, X_3)$, $X_2$ independent $(X_1, X_3)$, $X_3$ independent $(X_1, X_2)$.//
+
+Then R commands:
+```{r}
+indep.login = loglin(data.array,margin = list(1,2,3),param = TRUE,fit = TRUE)
+indep.login$param
+
+```
+
+```{r}
+paste("The number of degree of freedom is ", indep.login$df)
+paste("The value of the likelihood ratio statistic is ", indep.login$lrt)
+paste("The value of X2 statistic is", indep.login$pearson)
+```
+
+Then the p-value for testing the null hypothesis 
+$$H_0: u_{12(ij)}= u_{13(ik)} = u_{23(jk)} = u_{123(ijk)} = 0$$
+based on $G^2$ is given by $P(\chi_12^2\geq 1078.8)$ and is obtained with the R call
+```{r}
+1 - pchisq(indep.login$lrt, indep.login$df)
+```
+
+The p-value for testing $H_0$ based on $X^2$ is obtained with the call 
+```{r}
+1 - pchisq(indep.login$pearson, indep.login$df)
+```
+From both the test above, we can reject $H_0$ and conclude that the complete independence model does not fit well in this data.
+
+
+# Models with One variable Independent of the Other Two
+In thi section, we will try three models: 
+1. [1][23], i.e. The model of independece of $X_1$ and $(X_2, X_3)$, and the corresponding $H_0$ is
+$$H_0: u_{12(ij)}= u_{13(ik)}  = u_{123(ijk)} = 0$$
+
+2. [2][13], i.e. The model of independece of $X_2$ and $(X_1, X_3)$,  and the corresponding $H_0$ is
+$$H_0: u_{12(ij)}= u_{23(jk)}  = u_{123(ijk)} = 0$$
+
+3. [3][12], i.e. The model of independece of $X_3$ and $(X_1, X_2)$,  and the corresponding $H_0$ is
+$$H_0: u_{13(ik)}= u_{23(jk)}  = u_{123(ijk)} = 0$$
+
+Model1: [1][23] contains an interaction term between $X_2$ and $X_3$, but no interaction terms between $X_1$ and $X_2$ or between $X_1$ and $X_3$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{23(jk)} $$
+We fit model1 by R code
+```{r}
+X1indepX2X3 = loglin(data.array, margin = list(1, c(2,3)), fit = TRUE, param = TRUE)
+```
+
+```{r}
+P_val <- function(model){
+  p1 = 1 - pchisq(model$lrt, model$df)
+  p2 = 1 - pchisq(model$pearson, model$df)
+  paste("The p-value based on G2 is", p1, ", The p-value based on X2 is", p2)
+}
+P_val(X1indepX2X3)
+```
+we reject $H_0$, which indicates that model [1][23] does not fit the data.
+
+
+Model2: [2][13] contains an interaction term between $X_1$ and $X_3$, but no interaction terms between $X_2$ and $X_1$ or between $X_2$ and $X_3$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{13(ik)} $$
+We fit model2 by R code
+```{r}
+X2indepX1X3 = loglin(data.array, margin = list(2, c(1,3)), fit = TRUE, param = TRUE)
+P_val(X2indepX1X3)
+```
+we reject $H_0$, which indicates that model [2][13] does not fit data.
+
+
+Model3: [3][12] contains an interaction term between $X_1$ and $X_2$, but no interaction terms between $X_3$ and $X_1$ or between $X_3$ and $X_2$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} $$
+We fit model3 by R code
+```{r}
+X3indepX1X2 = loglin(data.array, margin = list(3, c(1,2)), fit = TRUE, param = TRUE)
+P_val(X3indepX1X2)
+```
+we reject $H_0$, which indicates that model [3][12] does not fit data.
+
+# Model of Conditional Independece
+In this section, we will try three models:
+model1: [12][13] the model of conditional independece of $X_2$ and $X_3$ given $X_1$, and $H_0$ is
+$$H_0: u_{23(jk)}  = u_{123(ijk)} = 0$$
+
+model2: [12][23] the model of conditional independece of $X_1$ and $X_3$ given $X_2$, and $H_0$ is
+$$H_0: u_{13(ik)}  = u_{123(ijk)} = 0$$
+
+
+model3: [13][23] the model of conditional independece of $X_1$ and $X_2$ given $X_3$, and $H_0$ is
+$$H_0: u_{12(ij)}  = u_{123(ijk)} = 0$$
+
+Model1: [12][13] contains an interaction term between $X_1$ and $X_2$, an interaction between $X_1$ and $X_3$, but no interaction terms between $X_2$ and $X_3$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} + u_{13(ik)} $$
+We fit model1 by R code
+```{r}
+X2indepX3givenX1 = loglin(data.array, margin = list(c(1,2), c(1,3)), fit = TRUE, param = TRUE)
+```
+```{r}
+P_val(X2indepX3givenX1)
+```
+Both p-values are less than 0.05, hence we will reject $H_0$,  which indicates that model [12][13] does not fit data.
+
+
+Model2: [12][23] contains an interaction term between $X_1$ and $X_2$, an interaction between $X_2$ and $X_3$, but no interaction terms between $X_1$ and $X_3$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} + u_{23(jk)} $$
+We fit model1 by R code
+```{r}
+X1indepX3givenX2 = loglin(data.array, margin = list(c(1,2), c(2,3)), fit = TRUE, param = TRUE)
+```
+```{r}
+P_val(X1indepX3givenX2)
+```
+Both p-values are less than 0.05, hence we will reject $H_0$,  which indicates that model [12][23] does not fit data.
+
+
+
+Model3: [13][23] contains an interaction term between $X_1$ and $X_3$, an interaction between $X_2$ and $X_3$, but no interaction terms between $X_1$ and $X_2$, which  can be expressed as
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{13(ik)} + u_{23(jk)} $$
+We fit model1 by R code
+```{r}
+X1indepX2givenX3 = loglin(data.array, margin = list(c(1,3), c(2,3)), fit = TRUE, param = TRUE)
+```
+```{r}
+P_val(X1indepX2givenX3)
+```
+Both p-values are less than 0.05, hence we will reject $H_0$,  which indicates that model [13][23] does not fit data.
+
+# The Model of No Second Order Interaction 
+This model [12][13][23] is obtained from the saturated log-linear model by setting the second order interaction terms to zero:
+$$u_{123(ijk)} = 0$$
+It contains an interaction term between $X_1$ and $X_2$, between $X_1$ and $X_3$, and between $X_2$ and $X_3$
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} + u_{13(ik)} +u_{23(jk)} $$
+In this model, the $H_0$ is $$u_{123(ijk)} = 0$$
+
+
+R codes:
+```{r}
+no2ind.loglin = loglin(data.array, margin = list(c(1,2), c(1,3), c(2,3)), fit=TRUE, param = TRUE)
+```
+```{r}
+P_val(no2ind.loglin)
+```
+
+We will not reject $H_0$ based on p-values, which indicates that no second order interaction model fits data well, and a log-linear model that is representative for the associations among "Safety Equipment in Use", "Whether Ejected" and "Injury" is the model [12][13][23], 
+$$logm_{ijk} = u + u_{1(i)} + u_{2(j)} + u_{3{k}} + u_{12(ij)} + u_{13(ik)} +u_{23(jk)} $$
+
+
+
+
+# Question 2
+
+Since we have chosen the model[12][13][23], we find the parameters of this model are
+```{r}
+no2ind.loglin$param
+```
+Again We set the variable "Safety Equipment in Use" be $X_1$, "Whether Ejected" be $X_2$, and "Injury" be $X_3$. Hence the logistic regression here is 
+$$log\frac{P(X_3=2|X_1, X_2)}{P(X_3=1| X_1, X_2)}$$
+where $X_3=2$ represents "Fatal", while $X_3=1$ represents "Non-fatal".
+
+We then assume "$X_1=1$" represents "Seat belt" and $X_1 =  2$ represents "None" in variable "Safety Equipment in Use";  $X_2=1$ presents "Yes" and $X_2 = 2$ represents "No" in variable "Whether Ejected". Then the regression is expressed using the u-terms of the log-linear model [12][13][23] as follows:
+
+$$log\frac{P(X_3=k_1|X_1=i, X_2=j)}{P(X_3=k_2|X_1=i, X_2=j)} = (u_{3(k_1)}-u_{3(k_2)}) + (u_{13(ik_1)} - u_{13(ik_2)}) + (u_{23(jk_1)} - u_{23(jk_2)})$$
+We first calcualte the odds of "Fatal"($X_3=2$) vs. "Non-fatal"($X_3=1$) for Seat belt in use ($X_1=1$) and Ejected($X_2=1$), that is
+$$\frac{P(X_3=2|X_1=1, X_2=1)}{P(X_3=1|X_1=1, X_2=1)}=exp((\hat{u}_{3(2)} - \hat{u}_{3(1)}) +(\hat{u}_{13(12)} - \hat{u}_{13(11)}) +  (\hat{u}_{23(12)} - \hat{u}_{23(11)}))$$
+The estimate of the odds is
+```{r}
+exp((-2.251693 - ( 2.251693)) + ( -0.4293324 - 0.4293324) + ( 0.6994481 - (- 0.6994481))  )
+```
+
+
+We then calcualte the odds of "Fatal"($X_3=2$) vs. "Non-fatal"($X_3=1$) for "No Safety Equipment in Use ($X_1=2$) and  Ejected($X_2=1$), that is
+$$\frac{P(X_3=2|X_1=2, X_2=1)}{P(X_3=1|X_1=2, X_2=1)}=exp((\hat{u}_{3(2)} - \hat{u}_{3(1)}) +(\hat{u}_{13(22)} - \hat{u}_{13(21)}) +  (\hat{u}_{23(12)} - \hat{u}_{23(11)}))$$
+The estimate of the odds is
+```{r}
+exp((-2.251693 - (+ 2.251693)) + (0.4293324 - (-0.4293324)) + (0.6994481 - (-0.6994481))  )
+
+```
+
+
+We then calcualte the odds of "Fatal"($X_3=2$) vs. "Non-fatal"($X_3=1$) for Seat belt in use ($X_1=1$) and not Ejected($X_2=2$), that is
+$$\frac{P(X_3=2|X_1=1, X_2=2)}{P(X_3=1|X_1=1, X_2=2)}=exp((\hat{u}_{3(2)} - \hat{u}_{3(1)}) +(\hat{u}_{13(12)} - \hat{u}_{13(11)}) +  (\hat{u}_{23(22)} - \hat{u}_{23(21)}))$$
+The estimate of the odds is
+```{r}
+exp(( -2.251693 - (2.251693)) + (-0.4293324 - 0.4293324) + (- 0.6994481 -0.6994481 )  )
+```
+
+We finally calcualte the odds of "Fatal"($X_3=2$) vs. "Non-fatal"($X_3=1$) for Seat belt not in use ($X_1=2$) and not Ejected($X_2=2$), that is
+$$\frac{P(X_3=2|X_1=2, X_2=2)}{P(X_3=1|X_1=2, X_2=2)}=exp((\hat{u}_{3(2)} - \hat{u}_{3(1)}) +(\hat{u}_{13(22)} - \hat{u}_{13(21)}) +  (\hat{u}_{23(22)} - \hat{u}_{23(21)}))$$
+The estimate of the odds is
+```{r}
+exp((-2.251693 - (2.251693)) + (0.4293324 - (-0.4293324)) + ( -0.6994481 - 0.6994481)  )
+```
+
+Based on this regression, the chance of having a fatal injury is much smaller than that of having a non-fatal injury, whatever the condition is. We also can find that in automobile accident, people with seat belt in use and not ejected are the most likely to be "Non-fatal" than to "Fatal", while people with no safety equipment in use and ejected are the most likely to be "Fatal" than to "Non-fatal". This analysis tells us that we should at least use seat belt as a tool of safety equipment when driving.
+
+
+
+
+# Question 3
+```{r}
+data.array
+```
+
+model1
+```{r}
+mydata = matrix(c(rep(c(1,1,1),1105),rep(c(2,1,1),4624),rep(c(1,2,1),411111),rep(c(2,2,1),157342),rep(c(1,1,2),14),rep(c(2,1,2),497),rep(c(1,2,2),483),rep(c(2,2,2),1008)),ncol = 3, byrow = TRUE)
+
+```
+In question 3, We denote the response "Injury" as $Y$, and $Y=1$ represents "Non-fatal", $Y=2$ represents "Fatal".
+
+We denote "Safety Equipment in Use", "Whether Ejected" as $X_1$, $X_2$, respectively.
+We will logistic regression models 
+$$log\frac{P(Y=1|X)}{P(Y=2|X)}= X\beta$$
+where $X$ can be any of {1}, {1, $X_1$}, {1, $X_2$}, {1, $X_1$, $X_2$},hence 4 models in total.//
+
+model1: $$log\frac{P(Y=1|X)}{P(Y=2|X)}= \beta_0$$
+```{r}
+mylogit = glm(factor(mydata[,3])~1, family=binomial(link=logit))
+```
+
+
+model2:  $$log\frac{P(Y=1|X)}{P(Y=2|X)}= \beta_0 + \beta_1 * X_1$$
+```{r}
+mylogit_X1 = glm(factor(mydata[,3])~factor(mydata[,1]), family=binomial(link=logit))
+```
+
+
+model3:  $$log\frac{P(Y=1|X)}{P(Y=2|X)}= \beta_0 + \beta_2* X_2$$
+```{r}
+mylogit_X2= glm(factor(mydata[,3])~factor(mydata[,2]), family=binomial(link=logit))
+
+```
+
+
+model4: $$log\frac{P(Y=1|X)}{P(Y=2|X)}= \beta_0 + \beta_1 * X_1+\beta_2* X_2$$
+```{r}
+mylogit_all= glm(factor(mydata[,3])~factor(mydata[,1])+factor(mydata[,2]),family=binomial(link=logit))
+```
+
+
+
+```{r}
+# AIC 
+print("------AIC-----")
+AIC(mylogit)
+AIC(mylogit_X1)
+AIC(mylogit_X2)
+AIC(mylogit_all)
+print("------BIC-----")
+#BIC
+BIC(mylogit)
+BIC(mylogit_X1)
+BIC(mylogit_X2)
+BIC(mylogit_all)
+
+```
+
+Based on both AIC and BIC, we prefer to choose the model with both $X_1$ and $X_2$ as the explantory variable,, i.e. the model
+$$log\frac{P(Y=1|X)}{P(Y=2|X)}= \beta_0 + \beta_1* X_1+\beta_2* X_2$$
+fits the data best.
+
+```{r}
+summary(mylogit_all)
+```
+Interpretation:  the log odds of non-fatal v.s fatal is -3.96 when X1, X2 is 1.
+when X1 changing from 1 to 2, the log odds of non-fatal injury V.S. fatal injury changed by 1.72 holding
+X2 constant;when X2 changing from 1 to 2, the log odds of non-fatal injury V.S. fatal injury changed by
+-2.80 holding X1 constant.
+
+
+# Question 4
+Summary of my findings.
+
+Based on Question 1, we can find that the model without second order interaction term fits the data best.
+
+Based on Question 2, we can find that in automobile accident, people with seat belt in use and not ejected
+are the most likely to be "Non-fatal" than to "Fatal" (i.e. the safest way), while people with no safety equipment in use and ejected are the most likely to be "Fatal" than to "Non-fatal" (i.e. the most dangerous way). This analysis tells us that we should at least use seat belt as a toll of safety equipment when driving.
+
+
+Based on Question 3, the factor "Whether Ejected" and "Safety in use" seem to be the determining the seriousness
+of the injuries sustained after a car accident.
+
+
+We then explore the relationship between these factors.
+```{r}
+library(corrplot)
+library(RColorBrewer)
+M <-cor(mydata)
+corrplot(M, type="upper")
+
+```
+From the correlation matrix, we can find that there exists a positive relationship between "Safety Equipment in Use" and "Whether Ejected", and between "Injury" and "Whether Ejected"; there exists a negative relationship between "Injury" and "Safety Equipment in Use".
+
+
+Bayesian Testing
+```{r}
+bayes.test = function(var1,var2)
+{
+#two-way table
+obstable = table(var1,var2);
+#first one-way marginal
+rowtable = table(var1);
+#second one-way marginal
+columntable = table(var2);
+#calculate the log-marginal likelihood under the saturated log-linear model
+alpha = 0.25;
+logmargSaturated = lgamma(4*alpha)-4*lgamma(alpha);
+logmargSaturated = logmargSaturated +sum(lgamma(as.vector(obstable+alpha)));
+logmargSaturated = logmargSaturated -lgamma(sum(as.vector(obstable+alpha)));
+#calculate the log-marginal likelihood under the log-linear model of independence
+logmargIndep = 2*lgamma(4*alpha)-4*lgamma(2*alpha);
+logmargIndep = logmargIndep + sum(lgamma(as.vector(rowtable+2*alpha)));
+logmargIndep = logmargIndep+sum(lgamma(as.vector(columntable+2*alpha)));
+logmargIndep = logmargIndep - lgamma(sum(as.vector(rowtable+2*alpha)));
+logmargIndep = logmargIndep -lgamma(sum(as.vector(columntable+2*alpha)));
+return(2*(logmargSaturated-logmargIndep));
+}
+
+```
+
+
+```{r}
+bayes.test(mydata[,1], mydata[,3])
+
+```
+
+```{r}
+bayes.test(mydata[,2], mydata[,3])
+```
+
+Based on Bayesian Testing, we can find that there exist strong relationship between "Injury" and other two explantory variables.
+
+
+
+# Problem 2
+We will perform different methods for model selection.
+```{r}
+library(gRbase)
+library(gRim)
+library(graph)
+library(Rgraphviz)
+```
+
+```{r}
+# data set
+data(reinis)
+str(reinis)
+```
+
+We display the saturated model:
+```{r}
+m<-dmod(~.^.,data=reinis)
+formula(m)
+```
+We denote these 6 variables as $A,B,C,D,E,F$:
+
+$A$ indicates whether or not the worker "smokes",
+
+$B$ corresponds to "strenuous mental work"
+
+$C$ corresponds to "strenuous physical work"
+
+$D$ corresponds to "systolic blood pressure"
+
+$E$ corresponds to "ratio of $\beta$ and $\alpha$ lipoproteins"
+
+$F$ represents "family anamnesis of coronary heart disease".
+
+# Model selection based on the paper"A fast procedure for model search in multidimensional contingency tables"
+The first step consists of removing one edge at a time from the saturated model, i.e. fitting the candidate models
+$C_0$,
+$$C_0=\{(AB)^{-1}, (AC)^{-1},..., (EF)^{-1}   \}$$
+there are 6 choose 2, 15 models in total, and each of them can be derived by deleting one edge at a time from the saturated model. We will take the model $(AB)^{-1}$ as an example.
+
+
+```{r}
+m_AB<-update(m,list(dedge=~smoke:mental))
+plot(m_AB)
+```
+The Figure of model $(AB)^{-1}$ can verify the deleting edge is AB.
+
+Then we need to list all of the candidates and compare these 15 models with the saturated model by likelihood ratio test.
+```{r}
+# list all of the candidate models
+combinations <- combn(c("smoke", "mental", "phys", "systol","protein", "family"), 2)
+combinations
+```
+
+
+```{r}
+# deleting one edge 
+# A.
+m_AB <- update(m,list(dedge=~smoke:mental))
+m_AC <- update(m,list(dedge=~smoke:phys))
+m_AD <- update(m,list(dedge=~smoke:systol))
+m_AE <- update(m,list(dedge=~smoke:protein))
+m_AF <- update(m,list(dedge=~smoke:family))
+
+# B.
+m_BC<-update(m,list(dedge=~phys:mental))
+m_BD<-update(m,list(dedge=~systol:mental))
+m_BE<-update(m,list(dedge=~mental:protein))
+m_BF<-update(m,list(dedge=~mental:family))
+
+# C.
+m_CD<-update(m,list(dedge=~systol:phys))
+m_CE<-update(m,list(dedge=~phys:protein))
+m_CF<-update(m,list(dedge=~phys:family))
+
+# D.
+m_DE<-update(m,list(dedge=~systol:protein))
+m_DF<-update(m,list(dedge=~systol:family))
+
+# E.
+m_EF<-update(m,list(dedge=~protein:family))
+```
+
+We perform G2 and X2 test and calculate p-values based on models.
+```{r}
+P_val <- function(model){
+  #model is the model deleting one edge
+  p1 = 1 - pchisq(model$fitinfo$dev, model$fitinfo$dimension[4] )
+  p2 = 1 - pchisq(model$fitinfo$pearson, model$fitinfo$dimension[4])
+  cat("The p-value based on G2 is", p1, ", The p-value based on X2 is", p2, "\n")
+  return (list(p1=p1, p2=p2))
+}
+
+candidates <- list(m_AB,m_AC,m_AD,m_AE,m_AF,m_BC,m_BD,m_BE,m_BF,m_CD,m_CE,m_CF,m_DE,m_DF,m_EF)
+s <- sapply(candidates ,P_val)
+
+```
+
+
+```{r}
+# at 5% level
+combinations[, which(s[1,] < 0.05)]
+combinations[, which(s[2,] < 0.05)]
+```
+From the results of both tests, we will reject these five models: m_AC, m_AD, m_AE, m_BC, m_DE, i.e. {(AC)-, (AD)-, (AE)-, (BC)-,(DE)-}, and accept models: m_AB, m_AF, m_BD, m_BE, m_BF, m_CD, m_CF, m_DF, m_DF.
+
+
+The second step is fit the model (AC,AD,AE,BC,DE)+,
+```{r}
+m_second <-  dmod(~smoke*protein*systol+smoke*phys+mental*phys+family,data=reinis)
+p <- P_val(m_second)
+```
+At 5% level, this model is rejected, so the rejected models now are {(AC)-, (AD)-, (AE)-, (BC)-,(DE)-, (AC,AD,AE,BC,DE)+}.
+
+The third step is to fit the models that contain the edges AC, AD, AE, BC, and DE, plus one edge from {AB, AF, BD, BE, BF, CD, CF, DF, DF}, upward stepping from the model fitted in the second step.
+
+
+
+```{r}
+m_second_AB <- update(m_second, list(aedge=~smoke:mental))
+m_second_AF <- update(m_second, list(aedge=~smoke:family))
+m_second_BD<-update(m_second,list(aedge=~mental:systol))
+m_second_BE<-update(m_second,list(aedge=~mental:protein))
+m_second_BF<-update(m_second,list(aedge=~mental:family))
+m_second_CD<-update(m_second,list(aedge=~phys:systol))
+m_second_CE<-update(m_second,list(aedge=~phys:protein))
+m_second_CF<-update(m_second,list(aedge=~phys:family))
+m_second_DF<-update(m_second,list(aedge=~systol:family))
+m_second_EF<-update(m_second,list(aedge=~protein:family))
+
+```
+
+
+
+```{r}
+m_list <- list(m_second_AB, m_second_AF, m_second_BD, m_second_BE, m_second_BF, m_second_CD,m_second_CE, m_second_CF,m_second_DF, m_second_EF)
+s <- sapply(m_list, P_val)
+
+```
+
+```{r}
+which(s[1,]>0.05)
+which(s[2,]>0.05)
+```
+
+based on both tests, only two models are not rejected: m_second_BE and m_second_CE, namely (AC,AD,AE,BC,DE,BE)+, (AC,AD,AE,BC,DE,CE)+.
+
+Thus we obtain A = {(AC,AD,AE,BC,DE,BE)+, (AC,AD,AE,BC,DE,CE)+} since all other accepted models include one of these.
+
+The fourth step consists of examination if $D_r(A)/R$.
+$$D_r(A)/R=(BE, CE)^-$$
+```{r}
+# (BE, CE)-
+m_BECE <- update(m, list(dedge=~mental:protein+phys:protein))
+p <- P_val(m_BECE)
+```
+P-values of both tests are less than 0.05, hence this model is rejected and we can interpret this as meaning that either BE or CE must be in any acceptable model.
+
+We infer that the two models accepted at step three constitude a complete accepted set, and the procedure stops. In the generating set notation, these models are [AC, ADE, BC, BE, F] and [ACE, ADE, BC, F]. Explan: in model (AC,AD,AE,BC,DE,BE)+, AD, DE, AE -> ADE, in model (AC,AD,AE,BC,DE,CE)+, AC, CE, AE -> ACE, AD, AE, DE -> ADE
+
+Hence the final two models:
+```{r}
+# [AC, ADE, BC, BE, F]
+formula(m_second_BE)
+plot(m_second_BE)
+```
+
+
+```{r}
+# [ACE, ADE, BC, F]
+formula(m_second_CE)
+plot(m_second_CE)
+```
+
+
+Interpretations: The most striking feature of both models is the independence of the family anamnesis, F. 
+A dependence on D, E.
+The two models differ in thepresence or absence of the edges BE and CE.
+
+
+# Model selection based on AIC and BIC
+Another way to select model is based on AIC and BIC.
+AIC minimizes the negative of a penalized likelihood
+$$AIC(k) = - 2log(L) + kdim(M)$$
+where $dim(M)$ is the number of independent parameters in model $M$.
+
+BIC also penalized the likelihood, but in a more severe way
+$$BIC(k) = -2log(L) + log(n) dim(M)$$
+where $n$ is the number of observations. The results based on AIC and BIC are as follows
+
+```{r}
+# AIC
+aic <-stepwise(m)
+formula(aic)
+plot(aic)
+# BIC
+bic <- stepwise(m, k =log(sum(reinis)))
+formula(bic)
+plot(bic)
+```
+The differnece between the model selected by AIC and by BIC is (1). the independence or dependence of F; (2) the presence or absence of the dependence of mental and smoke.
+
+
+# Model selection based on BDMCMC algorithm
+```{r}
+library(BDgraph)
+data("reinis")
+sample <- bdgraph.mpl(data=reinis, method="dgm-binary",  iter = 10000, burnin = 6000)
+```
+
+```{r}
+summary(sample)
+```
+
+
+```{r}
+select(sample, cut=0.5,vis = TRUE)
+
+```
+
+Besides the model selected by AIC, the other models shows the independence of variable F, i.e. "family anamnesis of coronary heart disease. Hence we infer that variables A, B, C, D, E are not directly determinant of variable F and we will not include any of them into logistic regression model as variables.
+
+
+
+
+
+
+

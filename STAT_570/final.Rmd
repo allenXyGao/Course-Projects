@@ -1,0 +1,273 @@
+---
+title: "570final(take home)"
+author: "Xinyu Gao"
+date: "December 12, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+# Data generation
+# install.packages("Rlab")
+library(Rlab)
+mysample <- function(N) {
+  
+  # z1
+  Z1 <- rbern(N, 0.5)
+  # z2
+  Z2 <- sapply(Z1, function(x) rbern(1, 0.1 + 0.8 *x )   )
+  # x
+  X <- rnorm(N, -1+2*Z1, 1)
+  # Y
+  mu <- X * ifelse(Z1==Z2 ,1,0) - X*ifelse(Z1!=Z2, 1,0)
+  sd <- exp(0.2*abs(X))
+  Y <- rnorm(N, mu, sd)
+  # Pi
+  PI <- 0.01 * ifelse(Z1==Z2, 1, 0) + 0.09 * ifelse(Z1!=Z2, 1,0)
+  # S
+  S <- rbern(N, PI)
+  sampling <- data.frame(X=X, Y=Y,Z1=Z1,Z2=Z2, PI=PI, S=S)
+  
+  sampling <- sampling[which(sampling$S == 1), ]
+  
+  return (sampling)
+}
+
+```
+
+
+
+
+```{r}
+data <- mysample(10000)
+# the calculate the estiamtion of beta_0, beta_1, sigma^2
+find_parameters <- function(data){
+  # beta_0 and beta_1
+  m_left <- matrix(NA,2,2)
+  m_left[1,1] <- sum(1/data$PI)
+  m_left[1,2] <- sum(data$X/data$PI)
+  m_left[2,1] <-  sum(data$X/data$PI)
+  m_left[2,2] <- sum((data$X)^2/data$PI)
+  m_right <- matrix(NA, 2,1)
+  m_right[1,1] <-  sum(data$Y/data$PI)
+  m_right[2,1] <-  sum(data$X*data$Y/data$PI)
+  
+  beta <- solve(m_left) %*% m_right
+  
+  # yhat
+  X  <- cbind(rep(1, dim(data)[1]) , data$X)
+  yhat <- X %*% beta
+  
+  # estimate sigma^2
+  numerator <- sum(1/data$PI * (data$Y - yhat)^2)
+  denominator <- sum(1/data$PI)
+  sigma2 <- numerator / denominator
+  para <- data.frame(beta0 = beta[1], beta1 = beta[2], sigma2 = sigma2)
+  return (list(para=para, yhat=yhat))
+}
+
+parameters <- find_parameters(data)
+
+```
+
+```{r}
+# sandwich variance
+sandiwch_estimation <- function(data, parameters) {
+  
+  para <- parameters$para
+  yhat <- parameters$yhat
+  # A
+  A <- matrix(NA, 3,3)
+  A[1,1] <- 1/dim(data)[1] * sum(1/ data$PI * (- 1 / para$sigma2) )
+  A[1,2] <- 1/dim(data)[1] * sum(1/ data$PI * (- data$X / para$sigma2) )
+  A[2,1] <- A[1,2]
+  A[1,3] <- 0
+  A[3,1] <- 0
+  A[2,2] <- 1/dim(data)[1] * sum(1/ data$PI * (- (data$X)^2 / para$sigma2)  )
+  A[2,3] <- 0
+  A[3,2] <- A[2,3]
+  A[3,3] <- 1/dim(data)[1] * sum(1/ data$PI * ( 1/ (2* (para$sigma2)^2 ) - 1 /  (para$sigma2)^3 * (data$Y - yhat)^2 ))
+  
+  # B
+  B <- matrix(NA, 3,3)
+  B[1,1] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 *  (1/ (para$sigma2)^2) * (data$Y - yhat)^2 )
+  B[1,2] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 *  (1/ (para$sigma2)^2) * (data$Y - yhat)^2 * data$X )
+  B[2,1] <- B[1,2]
+  B[1,3] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 * (- 1 / (2*(para$sigma2)^2) * (data$Y - yhat)   +  1 / (2*(para$sigma2)^3) * ( data$Y - yhat)^3  ) )
+  B[3,1] <- B[1,3]
+  B[2,2] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 * 1 / (para$sigma2)^2 * (data$Y - yhat)^2 * (data$X)^2  )
+  B[2,3] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 * ( - 1 / (2*(para$sigma2)^2) * (data$Y - yhat) * data$X  +  1 / (2*(para$sigma2)^3) * data$X * (data$Y -yhat)^3 )    )
+  B[3,2] <- B[2,3]
+  B[3,3] <- 1/dim(data)[1] * sum(1/ (data$PI)^2 *  (-1 / (2*para$sigma2)  + 1 / (2*(para$sigma2)^2) * (data$Y - yhat)^2   )^2  )
+  
+  # sandwich 
+  A_inv <- solve(A)
+  var_estimate <- A_inv %*% B %*% t(A_inv)
+  
+  # estimated variance of beta_1
+  var_beta_1_estimate <- var_estimate[2,2]
+
+  
+  return (var_beta_1_estimate)
+}
+
+var_b1 <- sandiwch_estimation(data, parameters)
+
+CI_lower <- parameters$para$beta1 - 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+CI_upper <- parameters$para$beta1 + 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+c(CI_lower, CI_upper)
+
+```
+
+
+
+```{r}
+# Simulations
+count <- 0
+N = 1000000
+iters <- 1000
+betas <- matrix(NA, iters,1)
+for (i in 1:iters) {
+  
+  if (i %% 10 == 0) {
+    print(i)
+  }
+  data <- mysample(N)
+  parameters <- find_parameters(data)
+  hat_beta1 <- parameters$para$beta1
+  betas[i] <- hat_beta1
+  var_b1 <- sandiwch_estimation(data, parameters)
+  CI_lower <- hat_beta1 - 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  CI_upper <- hat_beta1 + 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  if (CI_lower <= 0.8 & CI_upper >= 0.8) {
+    count = count + 1
+  }
+}  
+  
+ 
+
+
+
+```
+```{r}
+# mean and quantiles
+print(mean(betas))
+print(quantile(betas, c(0.025,0.975)))
+```
+
+
+
+
+
+
+
+
+```{r}
+count2 <- 0
+N2 = 100000
+iters <- 1000
+betas2 <- matrix(NA, iters,1)
+for (i in 1:iters) {
+  
+  if (i %% 10 == 0) {
+    print(i)
+  }
+  data <- mysample(N2)
+  parameters <- find_parameters(data)
+  hat_beta1 <- parameters$para$beta1
+  betas2[i] <- hat_beta1
+  var_b1 <- sandiwch_estimation(data, parameters)
+  CI_lower <- hat_beta1 - 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  CI_upper <- hat_beta1 + 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  if (CI_lower <= 0.8 & CI_upper >= 0.8) {
+    count2 = count2 + 1
+  }
+}  
+
+  
+```
+```{r}
+print(N2)
+print(count2)
+print(mean(betas2))
+print(quantile(betas2, c(0.025,0.975)))
+```
+
+
+```{r}
+count3 <- 0
+N3 = 300000
+iters <- 1000
+betas3 <- matrix(NA, iters,1)
+for (i in 1:iters) {
+  
+  if (i %% 10 == 0) {
+    print(i)
+  }
+  data <- mysample(N3)
+  parameters <- find_parameters(data)
+  hat_beta1 <- parameters$para$beta1
+  betas3[i] <- hat_beta1
+  var_b1 <- sandiwch_estimation(data, parameters)
+  CI_lower <- hat_beta1 - 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  CI_upper <- hat_beta1 + 1.96 / sqrt(dim(data)[1]) * sqrt(var_b1)
+  if (CI_lower <= 0.8 & CI_upper >= 0.8) {
+    count3 = count3 + 1
+  }
+}  
+
+  
+```
+
+```{r}
+print(mean(betas3))
+print(quantile(betas3, c(0.025,0.975)))
+```
+
+
+
+
+
+
+
+```{r}
+# plot 1: coverage probability
+library(ggplot2)
+par(width=4,height=4)
+Names <- c("1e4", "3e4", "1e5", "3e5", "1e6")
+prob <- c(0.972, 0.969, 0.980, 0.981, 0.978)
+
+plot(prob, xlab = "Population size N", ylab="coverage probability", ylim = c(0.94,1) ,cex=1.4,pch=16, type="b",
+     main = "Estimated actual coverage probability of CI", xaxt="n")
+abline(h=0.95, lty=2, col="red")
+axis(1,at=seq(1,5,1),label=Names)
+
+
+
+# plot 2: the average and 2.5 and 97.5 percentiles of my point estimates
+
+legend <- rep(c("average", "2.5%", "97.5%"),each = 5)
+num <- rep(1:5, times=3)
+beta_val <- c(c(0.7895, 0.7961, 0.7995, 0.7999, 0.8001), c(0.5528, 0.6735, 0.7268, 0.7585, 0.7770),
+                  c(1.0063, 0.912, 0.8693,0.8436, 0.8229)   )
+d <- data.frame(order=num, type = type, beta = beta_val)
+ggplot(data = d, mapping = aes(x = order, y = beta, colour = legend)) + geom_line() + geom_point(size=2.5)+
+  labs(x = "Population size N", y = "estimations") +
+  scale_x_discrete(limits=c("1e4", "3e4", "1e5", "3e5", "1e6")) + 
+  geom_hline(aes(yintercept=0.8), colour="darkgreen", linetype="dashed")
+
+
+
+
+
+```
+
+
+
+
+
