@@ -16,7 +16,7 @@
  STAT 536 Analysis of Categorical and Count Data\
  Project Description:Log-linear models, Hierarchical model， Feature Selection
  
- STAT 554 Statistical models for Spatial analysis\
+ STAT 554 Statistical models for Spatial analysis
  Project Description: Death of drugs in Ohio - Spatial Analysis\
  1. The data includes the health information of 88 counties in Ohio State. We want to explore the relationship between death due to drug       abuse and HIV rate. 
  2. Matched FIPS codes in Ohio State shape files, detected spatial dependence by mapping the residuals from OLS fit and by Moran’s I test
