@@ -1,10 +1,10 @@
 # University of Washington, Seattle Course-Projects
 
  STAT 527 Nonparamatric Regression and Regression\
- Project Description: \
- 1. Spam classification by building Classification Tree and pruning the tree;\
- 2. Spam classification by building Ridge regression;\
- 3. College data regression and selected features by the forward stepwise selection\
+ Project Description: 
+ 1. Spam classification by building Classification Tree and pruning the tree;
+ 2. Spam classification by building Ridge regression;
+ 3. College data regression and selected features by the forward stepwise selection
  4. Handwritten digit data identification by K-NN
  
  STAT 534 Statistical Learning\
